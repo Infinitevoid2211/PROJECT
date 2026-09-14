@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+    :root {
+        --background: 210 40% 98%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 202 80% 21%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 160 84% 20%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 202 80% 21%;
+        --chart-1: 0 72% 51%;
+        --chart-2: 24 95% 45%;
+        --chart-3: 45 93% 35%;
+        --chart-4: 142 71% 40%;
+        --chart-5: 202 80% 35%;
+        --radius: 0.75rem;
+    }
+}
+
+@layer base {
+    * { @apply border-border; }
+    body { @apply bg-background text-foreground; }
+    h1, h2, h3, h4, .font-head { font-family: 'Outfit', sans-serif; }
+    .font-mono, code { font-family: 'IBM Plex Mono', monospace; }
+}
+
+::selection { background: #065F46; color: #fff; }
+
+.thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes ping-slow {
+    0% { transform: scale(1); opacity: 0.8; }
+    75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+.pulse-ring { animation: ping-slow 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.4s ease-out both; }
+
+.gps-dot {
+    width: 10px; height: 10px; border-radius: 999px;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.4);
+}
+.maplibregl-popup-content {
+    border-radius: 12px; padding: 12px 14px; font-family: 'IBM Plex Sans', sans-serif;
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,0.3);
+}
+.maplibregl-ctrl-attrib { font-size: 9px; }
+
+.tick-marquee { animation: marquee 28s linear infinite; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
