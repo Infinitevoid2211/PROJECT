@@ -1,0 +1,891 @@
+/app/frontend/src/index.js
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@/index.css";
+import App from "@/App";
+
+// Silence benign "ResizeObserver loop" errors (Recharts/MapLibre) that
+// otherwise trigger the react-dev fullscreen error overlay.
+const swallowResizeObserver = (e) => {
+  const msg = e?.message || e?.reason?.message || "";
+  if (typeof msg === "string" && msg.includes("ResizeObserver loop")) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    return false;
+  }
+};
+window.addEventListener("error", swallowResizeObserver);
+window.addEventListener("unhandledrejection", swallowResizeObserver);
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 60_000, refetchOnWindowFocus: false },
+  },
+});
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </React.StrictMode>,
+);
+/app/frontend/src/App.js
+import "@/App.css";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Dashboard from "@/pages/Dashboard";
+import { Toaster } from "@/components/ui/sonner";
+
+function App() {
+  return (
+    <div className="App">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+        </Routes>
+      </BrowserRouter>
+      <Toaster position="top-right" richColors />
+    </div>
+  );
+}
+
+export default App;
+/app/frontend/src/lib/api.js
+import axios from "axios";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+export const API = `${BACKEND_URL}/api`;
+
+export const api = {
+  zones: () => axios.get(`${API}/zones`).then((r) => r.data),
+  footfall: () => axios.get(`${API}/footfall`).then((r) => r.data),
+  stats: () => axios.get(`${API}/stats`).then((r) => r.data),
+  sensors: (id) => axios.get(`${API}/sensors/${id}`).then((r) => r.data),
+  history: () => axios.get(`${API}/history`).then((r) => r.data),
+  checkins: () => axios.get(`${API}/checkins`).then((r) => r.data),
+  createCheckin: (body) => axios.post(`${API}/checkins`, body).then((r) => r.data),
+  reports: () => axios.get(`${API}/reports`).then((r) => r.data),
+  createReport: (body) => axios.post(`${API}/reports`, body).then((r) => r.data),
+  alerts: () => axios.get(`${API}/alerts`).then((r) => r.data),
+  triggerAlert: (body) => axios.post(`${API}/alerts/trigger`, body).then((r) => r.data),
+};
+/app/frontend/src/lib/constants.js
+export const RISK = {
+  CRITICAL: { color: "#DC2626", bg: "#FEF2F2", ring: "#FCA5A5", label: "Critical" },
+  HIGH: { color: "#EA580C", bg: "#FFF7ED", ring: "#FDBA74", label: "High" },
+  MODERATE: { color: "#CA8A04", bg: "#FEFCE8", ring: "#FDE047", label: "Moderate" },
+  LOW: { color: "#16A34A", bg: "#F0FDF4", ring: "#86EFAC", label: "Low" },
+};
+
+export const riskOf = (lvl) => RISK[lvl] || RISK.LOW;
+
+export const AIZAWL_CENTER = [92.7176, 23.7271];
+/app/frontend/src/lib/i18n.js
+export const LANGS = [
+  { code: "en", label: "English", native: "English" },
+  { code: "lus", label: "Mizo", native: "Mizo Ṭawng" },
+  { code: "hi", label: "Hindi", native: "हिंदी" },
+  { code: "bn", label: "Bengali", native: "বাংলা" },
+];
+
+const dict = {
+  appName: { en: "BHU-RAKSHAK AI", lus: "BHU-RAKSHAK AI", hi: "भू-रक्षक AI", bn: "ভূ-রক্ষক AI" },
+  subtitle: {
+    en: "AI Landslide Early Warning · Aizawl, Mizoram",
+    lus: "AI Lei Inbo Hriattirna · Aizawl, Mizoram",
+    hi: "एआई भूस्खलन पूर्व चेतावनी · आइज़ोल, मिज़ोरम",
+    bn: "এআই ভূমিধস আগাম সতর্কতা · আইজল, মিজোরাম",
+  },
+  peopleAtRisk: { en: "People in risk zones", lus: "Hlauhawm khawvela mi", hi: "जोखिम क्षेत्र में लोग", bn: "ঝুঁকিপূর্ণ এলাকায় মানুষ" },
+  checkin: { en: "Emergency Check-In", lus: "Inentirna", hi: "आपातकालीन चेक-इन", bn: "জরুরি চেক-ইন" },
+  imSafe: { en: "I am safe", lus: "Ka him", hi: "मैं सुरक्षित हूँ", bn: "আমি নিরাপদ" },
+  needEvac: { en: "Need evacuation", lus: "Pemkhawh a ngai", hi: "निकासी चाहिए", bn: "উদ্ধার প্রয়োজন" },
+  triggerWarning: { en: "Dispatch Early Warning", lus: "Hriattirna thawn", hi: "पूर्व चेतावनी भेजें", bn: "আগাম সতর্কতা পাঠান" },
+};
+
+export const t = (key, lang) => (dict[key] && (dict[key][lang] || dict[key].en)) || key;
+/app/frontend/src/index.css
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+    :root {
+        --background: 210 40% 98%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 202 80% 21%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 160 84% 20%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 202 80% 21%;
+        --chart-1: 0 72% 51%;
+        --chart-2: 24 95% 45%;
+        --chart-3: 45 93% 35%;
+        --chart-4: 142 71% 40%;
+        --chart-5: 202 80% 35%;
+        --radius: 0.75rem;
+    }
+}
+
+@layer base {
+    * { @apply border-border; }
+    body { @apply bg-background text-foreground; }
+    h1, h2, h3, h4, .font-head { font-family: 'Outfit', sans-serif; }
+    .font-mono, code { font-family: 'IBM Plex Mono', monospace; }
+}
+
+::selection { background: #065F46; color: #fff; }
+
+.thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes ping-slow {
+    0% { transform: scale(1); opacity: 0.8; }
+    75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+.pulse-ring { animation: ping-slow 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.4s ease-out both; }
+
+.gps-dot {
+    width: 10px; height: 10px; border-radius: 999px;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.4);
+}
+.maplibregl-popup-content {
+    border-radius: 12px; padding: 12px 14px; font-family: 'IBM Plex Sans', sans-serif;
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,0.3);
+}
+.maplibregl-ctrl-attrib { font-size: 9px; }
+
+.tick-marquee { animation: marquee 28s linear infinite; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/app/frontend/src/App.css
+.App { min-height: 100vh; }
+
+
+/app/frontend/src/components/Map3D.jsx
+import { useEffect, useRef } from "react";
+import maplibregl from "maplibre-gl";
+import { riskOf } from "@/lib/constants";
+
+// Token-free style: OpenTopoMap raster base + AWS Terrarium DEM for real 3D terrain.
+const STYLE = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sources: {
+    topo: {
+      type: "raster",
+      tiles: [
+        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      maxzoom: 17,
+      attribution: "© OpenTopoMap (CC-BY-SA) · © OpenStreetMap contributors",
+    },
+    terrain: {
+      type: "raster-dem",
+      tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
+      encoding: "terrarium",
+      tileSize: 256,
+      maxzoom: 15,
+    },
+  },
+  layers: [
+    { id: "bg", type: "background", paint: { "background-color": "#eef2f4" } },
+    { id: "topo", type: "raster", source: "topo", paint: { "raster-opacity": 0.95 } },
+    {
+      id: "hills",
+      type: "hillshade",
+      source: "terrain",
+      paint: { "hillshade-exaggeration": 0.55, "hillshade-shadow-color": "#334155" },
+    },
+  ],
+  terrain: { source: "terrain", exaggeration: 1.6 },
+};
+
+export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, focusZone }) {
+  const ref = useRef(null);
+  const mapRef = useRef(null);
+  const gpsMarkers = useRef([]);
+  const ready = useRef(false);
+
+  useEffect(() => {
+    if (mapRef.current) return;
+    const map = new maplibregl.Map({
+      container: ref.current,
+      style: STYLE,
+      center: [92.7176, 23.7271],
+      zoom: 12.4,
+      pitch: 62,
+      bearing: -18,
+      maxPitch: 80,
+      attributionControl: false,
+    });
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+
+    map.on("load", () => {
+      map.setSky({
+        "sky-color": "#a9c9e8",
+        "sky-horizon-blend": 0.6,
+        "horizon-color": "#e8eef2",
+        "horizon-fog-blend": 0.6,
+        "fog-color": "#eef2f4",
+        "fog-ground-blend": 0.4,
+      });
+      ready.current = true;
+      renderZones();
+    });
+    // eslint-disable-next-line
+  }, []);
+
+  const renderZones = () => {
+    const map = mapRef.current;
+    if (!map || !ready.current || !zones?.length) return;
+
+    const fc = {
+      type: "FeatureCollection",
+      features: zones.map((z) => ({
+        type: "Feature",
+        properties: { id: z.id, name: z.name, risk: z.risk_level, color: riskOf(z.risk_level).color, prob: z.probability },
+        geometry: { type: "Point", coordinates: [z.lng, z.lat] },
+      })),
+    };
+
+    if (map.getSource("zones")) {
+      map.getSource("zones").setData(fc);
+    } else {
+      map.addSource("zones", { type: "geojson", data: fc });
+      map.addLayer({
+        id: "zone-halo", type: "circle", source: "zones",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "prob"], 20, 24, 90, 60],
+          "circle-color": ["get", "color"], "circle-opacity": 0.22, "circle-blur": 0.6,
+        },
+      });
+      map.addLayer({
+        id: "zone-core", type: "circle", source: "zones",
+        paint: {
+          "circle-radius": 8, "circle-color": ["get", "color"],
+          "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff",
+        },
+      });
+      map.addLayer({
+        id: "zone-label", type: "symbol", source: "zones",
+        layout: {
+          "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.6],
+          "text-anchor": "top", "text-font": ["Open Sans Regular"],
+        },
+        paint: { "text-color": "#0f172a", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
+      });
+
+      map.on("click", "zone-core", (e) => onSelectZone && onSelectZone(e.features[0].properties.id));
+      map.on("mouseenter", "zone-core", () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", "zone-core", () => (map.getCanvas().style.cursor = ""));
+    }
+  };
+
+  useEffect(() => { renderZones(); }, [zones]); // eslint-disable-line
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready.current) return;
+    if (map.getLayer("zone-halo")) {
+      map.setPaintProperty("zone-halo", "circle-opacity", showHeatmap ? 0.42 : 0.22);
+      map.setPaintProperty("zone-halo", "circle-radius",
+        showHeatmap
+          ? ["interpolate", ["linear"], ["get", "prob"], 20, 40, 90, 110]
+          : ["interpolate", ["linear"], ["get", "prob"], 20, 24, 90, 60]);
+    }
+  }, [showHeatmap]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready.current || !footfall?.zones) return;
+    gpsMarkers.current.forEach((m) => m.remove());
+    gpsMarkers.current = [];
+    footfall.zones.forEach((z) => {
+      const n = Math.min(14, Math.max(3, Math.round(z.people_in_zone / 12)));
+      const color = riskOf(z.risk_level).color;
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement("div");
+        el.className = "gps-dot";
+        el.style.background = color;
+        const jLat = z.lat + (Math.random() - 0.5) * 0.012;
+        const jLng = z.lng + (Math.random() - 0.5) * 0.012;
+        gpsMarkers.current.push(new maplibregl.Marker({ element: el }).setLngLat([jLng, jLat]).addTo(map));
+      }
+    });
+  }, [footfall]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready.current || !focusZone) return;
+    map.flyTo({ center: [focusZone.lng, focusZone.lat], zoom: 14.5, pitch: 68, bearing: -18, duration: 1600 });
+  }, [focusZone]);
+
+  return <div ref={ref} data-testid="map-3d-canvas" className="w-full h-full rounded-xl overflow-hidden" />;
+}
+I'll send the remaining 8 component files (Header, CheckinModal, AIAssistant, Dashboard + 5 tabs) in the final message so nothing is cut off.
+
+/app/frontend/src/components/Header.jsx
+import { useState, useEffect } from "react";
+import { ShieldAlert, Radio, Clock, Volume2, Languages, Siren } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LANGS, t } from "@/lib/i18n";
+
+export default function Header({ lang, setLang, onCheckin, criticalCount }) {
+  const [clock, setClock] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setClock(d.toLocaleTimeString("en-IN", { hour12: false, timeZone: "Asia/Kolkata" }) + " IST");
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const siren = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sawtooth"; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.1);
+      o.frequency.setValueAtTime(620, ctx.currentTime);
+      o.frequency.linearRampToValueAtTime(950, ctx.currentTime + 0.6);
+      o.frequency.linearRampToValueAtTime(620, ctx.currentTime + 1.2);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.6);
+      o.stop(ctx.currentTime + 1.7);
+    } catch (e) {}
+  };
+
+  return (
+    <header data-testid="app-header"
+      className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="relative grid place-items-center h-10 w-10 rounded-xl bg-[#0B3B60] text-white shrink-0">
+          <ShieldAlert size={20} />
+          <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
+        </div>
+        <div className="min-w-0">
+          <h1 className="font-head font-extrabold text-slate-900 text-base sm:text-lg leading-tight tracking-tight truncate">{t("appName", lang)}</h1>
+          <p className="text-[11px] sm:text-xs text-slate-500 font-mono truncate">{t("subtitle", lang)}</p>
+        </div>
+        <span className="hidden md:inline-flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold font-mono uppercase tracking-wider">
+          <Radio size={12} className="animate-pulse" /> Live
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-3">
+        {criticalCount > 0 && (
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-xs font-bold font-mono">
+            <span className="relative flex h-2 w-2">
+              <span className="pulse-ring absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+            </span>
+            {criticalCount} CRITICAL
+          </span>
+        )}
+        <span className="hidden lg:inline-flex items-center gap-1.5 text-xs font-mono text-slate-500"><Clock size={14} /> {clock}</span>
+        <Button data-testid="btn-siren-test" variant="outline" size="icon" onClick={siren} title="Test siren"
+          className="border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200"><Siren size={16} /></Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button data-testid="language-selector" variant="outline" size="sm" className="border-slate-200 text-slate-600 gap-1.5">
+              <Languages size={15} />
+              <span className="hidden sm:inline text-xs font-semibold">{LANGS.find((l) => l.code === lang)?.label}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {LANGS.map((l) => (
+              <DropdownMenuItem key={l.code} data-testid={`lang-${l.code}`} onClick={() => setLang(l.code)}>
+                <span className="font-medium">{l.label}</span>
+                <span className="ml-2 text-xs text-slate-400">{l.native}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button data-testid="btn-emergency-checkin" onClick={onCheckin} className="bg-[#DC2626] hover:bg-red-700 text-white font-semibold gap-1.5 shadow-sm">
+          <Volume2 size={16} />
+          <span className="hidden sm:inline">{t("checkin", lang)}</span>
+          <span className="sm:hidden">SOS</span>
+        </Button>
+      </div>
+    </header>
+  );
+}
+/app/frontend/src/components/CheckinModal.jsx
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShieldCheck, AlertOctagon } from "lucide-react";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { t } from "@/lib/i18n";
+
+export default function CheckinModal({ open, onOpenChange, zones, lang, onDone }) {
+  const [name, setName] = useState("");
+  const [zoneId, setZoneId] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (status) => {
+    if (!name.trim() || !zoneId) { toast.error("Enter your name and select your zone"); return; }
+    setBusy(true);
+    let coords = {};
+    try {
+      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 }));
+      coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch (e) { coords = {}; }
+    try {
+      await api.createCheckin({ name: name.trim(), zone_id: zoneId, status, note, ...coords });
+      toast.success(status === "SAFE" ? "Check-in recorded: marked SAFE" : "Evacuation request sent to SDRF");
+      setName(""); setNote(""); setZoneId(""); onOpenChange(false); onDone && onDone();
+    } catch (e) { toast.error("Failed to submit check-in"); } finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="checkin-modal" className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-head text-xl">{t("checkin", lang)}</DialogTitle>
+          <DialogDescription>Your GPS location is logged to the district safety register. Responders see your status live.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label className="text-xs font-semibold">Full name</Label>
+            <Input data-testid="checkin-name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lalremruata" className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold">Your zone</Label>
+            <Select value={zoneId} onValueChange={setZoneId}>
+              <SelectTrigger data-testid="checkin-zone-select" className="mt-1"><SelectValue placeholder="Select zone" /></SelectTrigger>
+              <SelectContent>{zones.map((z) => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold">Note (optional)</Label>
+            <Textarea data-testid="checkin-note-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. trapped near NH-54 with 3 others" className="mt-1 resize-none" rows={2} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button data-testid="checkin-safe-btn" disabled={busy} onClick={() => submit("SAFE")} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+            <ShieldCheck size={18} /> {t("imSafe", lang)}
+          </Button>
+          <Button data-testid="checkin-evac-btn" disabled={busy} onClick={() => submit("NEED_EVACUATION")} className="bg-[#DC2626] hover:bg-red-700 text-white gap-2">
+            <AlertOctagon size={18} /> {t("needEvac", lang)}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+/app/frontend/src/components/AIAssistant.jsx
+import { useState, useRef, useEffect } from "react";
+import { Bot, Send, Sparkles, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { API } from "@/lib/api";
+
+const SESSION = "sih-" + Math.random().toString(36).slice(2, 10);
+const PROMPTS = [
+  "What is the current safety protocol for Hunthar Veng?",
+  "Draft an evacuation SMS for Ramhlun North",
+  "Explain the rainfall threshold curve",
+  "Which zone needs immediate NDRF deployment?",
+];
+
+export default function AIAssistant() {
+  const [messages, setMessages] = useState([
+    { role: "assistant", content: "Namaste. I'm BHU-RAKSHAK AI — your geotechnical risk & disaster-protocol assistant for Aizawl. Ask me about any zone, or tap a prompt below." },
+  ]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  const send = async (text) => {
+    const q = (text ?? input).trim();
+    if (!q || streaming) return;
+    setInput("");
+    setMessages((m) => [...m, { role: "user", content: q }, { role: "assistant", content: "" }]);
+    setStreaming(true);
+    try {
+      const res = await fetch(`${API}/ai/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: SESSION, message: q }),
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop();
+        for (const p of parts) {
+          const line = p.replace(/^data:\s*/, "").trim();
+          if (!line) continue;
+          try {
+            const j = JSON.parse(line);
+            if (j.delta) {
+              setMessages((m) => {
+                const c = [...m];
+                c[c.length - 1] = { role: "assistant", content: c[c.length - 1].content + j.delta };
+                return c;
+              });
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      setMessages((m) => {
+        const c = [...m];
+        c[c.length - 1] = { role: "assistant", content: "Connection error. Please try again." };
+        return c;
+      });
+    } finally { setStreaming(false); }
+  };
+
+  return (
+    <div data-testid="ai-assistant" className="flex flex-col h-full bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50">
+        <div className="grid place-items-center h-8 w-8 rounded-lg bg-[#065F46] text-white"><Bot size={17} /></div>
+        <div>
+          <p className="font-head font-bold text-sm text-slate-800">AI Risk & Protocol Assistant</p>
+          <p className="text-[11px] text-slate-500 font-mono">Claude · Sonnet 4.6</p>
+        </div>
+        <Sparkles size={15} className="ml-auto text-emerald-500" />
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto thin-scroll p-4 space-y-3 min-h-[240px]">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex gap-2.5 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
+            <div className={`grid place-items-center h-7 w-7 rounded-lg shrink-0 ${m.role === "user" ? "bg-[#0B3B60] text-white" : "bg-emerald-100 text-emerald-700"}`}>
+              {m.role === "user" ? <User size={14} /> : <Bot size={14} />}
+            </div>
+            <div className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user" ? "bg-[#0B3B60] text-white rounded-tr-sm" : "bg-slate-100 text-slate-800 rounded-tl-sm"}`}>
+              {m.content || <span className="inline-flex gap-1"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-3 pt-2 flex gap-2 flex-wrap border-t border-slate-100">
+        {PROMPTS.map((p, i) => (
+          <button key={i} data-testid={`ai-prompt-${i}`} onClick={() => send(p)} disabled={streaming}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 transition-colors disabled:opacity-50">
+            {p}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-3 flex gap-2">
+        <Input data-testid="ai-chat-input" value={input} onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask about any risk zone or protocol…"
+          className="border-slate-200" disabled={streaming} />
+        <Button data-testid="ai-chat-send-btn" onClick={() => send()} disabled={streaming} className="bg-[#065F46] hover:bg-emerald-800 text-white px-3">
+          <Send size={16} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const Dot = ({ d = 0 }) => (
+  <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${d}s` }} />
+);
+/app/frontend/src/pages/Dashboard.jsx
+import { useState, useEffect, useCallback } from "react";
+import Header from "@/components/Header";
+import CheckinModal from "@/components/CheckinModal";
+import AIAssistant from "@/components/AIAssistant";
+import GisTab from "@/components/tabs/GisTab";
+import SensorTab from "@/components/tabs/SensorTab";
+import ReportTab from "@/components/tabs/ReportTab";
+import EvacuationTab from "@/components/tabs/EvacuationTab";
+import HistoryTab from "@/components/tabs/HistoryTab";
+import { api } from "@/lib/api";
+import { riskOf } from "@/lib/constants";
+import { Map, Activity, Camera, ShieldAlert, Database, Bot, LayoutGrid, ServerCog, AlertTriangle } from "lucide-react";
+
+const TABS = [
+  { id: "gis", label: "3D Live GIS & GPS", icon: Map, testid: "tab-3d-gis-map" },
+  { id: "sensor", label: "Sensor & ML Warning", icon: Activity, testid: "tab-sensor-telemetry" },
+  { id: "report", label: "Citizen Crack AI", icon: Camera, testid: "tab-citizen-report" },
+  { id: "evac", label: "Evacuation & Check-In", icon: ShieldAlert, testid: "tab-evacuation-gps" },
+  { id: "history", label: "History & ML Model", icon: Database, testid: "tab-history-archive" },
+  { id: "ai", label: "AI Assistant", icon: Bot, testid: "tab-ai-assistant" },
+];
+
+const StatChip = ({ icon, label, value, color }) => (
+  <div className="flex items-center gap-2.5 px-3.5 py-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+    <div className="grid place-items-center h-8 w-8 rounded-lg" style={{ background: `${color}18`, color }}>{icon}</div>
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-none">{label}</p>
+      <p className="font-mono font-bold text-lg text-slate-800 leading-tight">{value}</p>
+    </div>
+  </div>
+);
+
+export default function Dashboard() {
+  const [lang, setLang] = useState("en");
+  const [tab, setTab] = useState("gis");
+  const [zones, setZones] = useState([]);
+  const [footfall, setFootfall] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [checkinOpen, setCheckinOpen] = useState(false);
+
+  const loadCore = useCallback(() => {
+    api.zones().then(setZones);
+    api.stats().then(setStats);
+  }, []);
+
+  useEffect(() => { loadCore(); }, [loadCore]);
+
+  useEffect(() => {
+    const tick = () => api.footfall().then(setFootfall);
+    tick();
+    const id = setInterval(tick, 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  const criticalCount = zones.filter((z) => z.risk_level === "CRITICAL").length;
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Header lang={lang} setLang={setLang} onCheckin={() => setCheckinOpen(true)} criticalCount={criticalCount} />
+
+      <div className="bg-slate-900 text-slate-100 overflow-hidden whitespace-nowrap">
+        <div className="tick-marquee inline-flex gap-8 py-1.5 text-xs font-mono">
+          {[...zones, ...zones].map((z, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: riskOf(z.risk_level).color }} />
+              {z.name}: <b style={{ color: riskOf(z.risk_level).color }}>{z.risk_level}</b> · {z.probability}% · {z.rainfall_24h_mm}mm/24h
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-4 sm:px-6 pt-4 flex gap-3 overflow-x-auto thin-scroll pb-1">
+        <StatChip icon={<LayoutGrid size={16} />} label="Zones" value={stats?.monitored_zones ?? "—"} color="#0B3B60" />
+        <StatChip icon={<AlertTriangle size={16} />} label="Critical" value={stats?.critical_zones ?? "—"} color="#DC2626" />
+        <StatChip icon={<ServerCog size={16} />} label="Sensors" value={stats ? `${stats.sensors_online}/${stats.sensors_total}` : "—"} color="#065F46" />
+        <StatChip icon={<Activity size={16} />} label="Alerts" value={stats?.active_alerts ?? "—"} color="#EA580C" />
+        <StatChip icon={<Camera size={16} />} label="Reports" value={stats?.citizen_reports ?? "—"} color="#7C3AED" />
+      </div>
+
+      <div className="px-4 sm:px-6 pt-4 flex gap-1.5 overflow-x-auto thin-scroll">
+        {TABS.map((tb) => {
+          const Icon = tb.icon;
+          const active = tab === tb.id;
+          return (
+            <button key={tb.id} data-testid={tb.testid} onClick={() => setTab(tb.id)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${active ? "bg-white text-[#0B3B60] border-[#0B3B60]" : "text-slate-500 border-transparent hover:text-slate-800 hover:bg-white/60"}`}>
+              <Icon size={16} /> {tb.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <main className="flex-1 px-4 sm:px-6 py-5">
+        {zones.length === 0 ? (
+          <div className="grid place-items-center h-96 text-slate-400">Loading pilot data…</div>
+        ) : (
+          <div key={tab} className="fade-up">
+            {tab === "gis" && <GisTab zones={zones} footfall={footfall} lang={lang} refresh={loadCore} />}
+            {tab === "sensor" && <SensorTab zones={zones} />}
+            {tab === "report" && <ReportTab zones={zones} />}
+            {tab === "evac" && <EvacuationTab zones={zones} footfall={footfall} lang={lang} onCheckin={() => setCheckinOpen(true)} refresh={loadCore} />}
+            {tab === "history" && <HistoryTab stats={stats} />}
+            {tab === "ai" && <div className="max-w-3xl mx-auto h-[600px]"><AIAssistant /></div>}
+          </div>
+        )}
+      </main>
+
+      <footer className="px-6 py-4 border-t border-slate-200 bg-white text-center">
+        <p className="text-xs text-slate-400 font-mono">BHU-RAKSHAK AI · SIH26001 · Ministry of DoNER · Pilot: Aizawl District, Mizoram · Simulated demo data</p>
+      </footer>
+
+      <CheckinModal open={checkinOpen} onOpenChange={setCheckinOpen} zones={zones} lang={lang} onDone={loadCore} />
+    </div>
+  );
+}
+/app/frontend/src/components/tabs/GisTab.jsx
+import { useState, useEffect, useRef } from "react";
+import Map3D from "@/components/Map3D";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { riskOf } from "@/lib/constants";
+import { t } from "@/lib/i18n";
+import { Users, TrendingUp, TrendingDown, Car, Gauge, Flame, MapPin, Send } from "lucide-react";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current, to = value, start = performance.now(), dur = 600;
+    let raf;
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      setDisplay(Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    prev.current = value;
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{display.toLocaleString("en-IN")}</>;
+}
+
+export default function GisTab({ zones, footfall, lang, refresh }) {
+  const [heatmap, setHeatmap] = useState(true);
+  const [focus, setFocus] = useState(null);
+  const [sending, setSending] = useState(false);
+
+  const dispatch = async (z) => {
+    setSending(true);
+    try {
+      const a = await api.triggerAlert({ zone_id: z.id, channel: "ALL", language: lang });
+      toast.success(`Early warning dispatched to ${a.people_notified} people in ${z.name}`);
+      refresh && refresh();
+    } catch (e) { toast.error("Dispatch failed"); } finally { setSending(false); }
+  };
+
+  const fz = footfall?.zones || [];
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 flex flex-col gap-4">
+        <div className="relative bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm">
+          <div className="h-[420px] sm:h-[520px]">
+            <Map3D zones={zones} footfall={footfall} showHeatmap={heatmap} focusZone={focus}
+              onSelectZone={(id) => setFocus(zones.find((z) => z.id === id))} />
+          </div>
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <div className="glass px-3 py-2 rounded-lg bg-white/90 backdrop-blur-md border border-slate-200 shadow-md flex items-center gap-2">
+              <Flame size={15} className="text-rose-500" />
+              <span className="text-xs font-semibold text-slate-700">Footfall Heatmap</span>
+              <Switch data-testid="gps-zone-heatmap-toggle" checked={heatmap} onCheckedChange={setHeatmap} />
+            </div>
+          </div>
+          <div className="absolute bottom-4 left-4 glass px-3 py-2 rounded-lg bg-white/90 backdrop-blur-md border border-slate-200 shadow-md">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Risk Level</p>
+            <div className="flex gap-3">
+              {["CRITICAL", "HIGH", "MODERATE", "LOW"].map((r) => (
+                <div key={r} className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: riskOf(r).color }} />
+                  <span className="text-[10px] font-mono text-slate-600">{riskOf(r).label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div data-testid="gps-footfall-live-counter" className="bg-[#0B3B60] text-white rounded-xl p-5 shadow-sm relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/90 flex items-center gap-1.5"><Users size={13} /> {t("peopleAtRisk", lang)}</p>
+          <p className="font-mono font-bold text-5xl mt-2 tracking-tight"><AnimatedNumber value={footfall?.total_people_at_risk || 0} /></p>
+          <div className="flex gap-4 mt-3 text-xs font-mono text-cyan-100/80">
+            <span>{footfall?.total_checkins || 0} check-ins</span>
+            <span className="text-red-300">{footfall?.need_evacuation || 0} need evac</span>
+          </div>
+          <p className="text-[10px] text-white/50 mt-2 font-mono">Simulated GPS telemetry · updates every 4s</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="font-head font-bold text-sm text-slate-800 flex items-center gap-2"><MapPin size={15} className="text-[#065F46]" /> Live Zone Footfall</p>
+          </div>
+          <div className="divide-y divide-slate-100 max-h-[440px] overflow-y-auto thin-scroll">
+            {fz.map((z) => {
+              const rk = riskOf(z.risk_level);
+              return (
+                <div key={z.zone_id} data-testid={`footfall-zone-${z.zone_id}`} className="p-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => setFocus(zones.find((x) => x.id === z.zone_id))}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: rk.color }} />
+                        <p className="text-sm font-semibold text-slate-800 truncate">{z.name}</p>
+                      </div>
+                      <span className="text-[10px] font-bold font-mono uppercase px-1.5 py-0.5 rounded mt-1 inline-block" style={{ background: rk.bg, color: rk.color }}>{z.risk_level}</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-mono font-bold text-lg text-slate-900">{z.people_in_zone}</p>
+                      <p className={`text-[11px] font-mono flex items-center gap-0.5 justify-end ${z.delta >= 0 ? "text-red-500" : "text-emerald-600"}`}>
+                        {z.delta >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                        {z.delta >= 0 ? "+" : ""}{z.delta}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2 text-[11px] font-mono text-slate-500">
+                    <span className="flex items-center gap-1"><Car size={11} /> {z.vehicles}</span>
+                    <span className="flex items-center gap-1"><Gauge size={11} /> {z.avg_velocity_kmph} km/h</span>
+                    {(z.risk_level === "CRITICAL" || z.risk_level === "HIGH") && (
+                      <Button size="sm" variant="ghost" disabled={sending} data-testid={`btn-dispatch-${z.zone_id}`}
+                        onClick={(e) => { e.stopPropagation(); dispatch(zones.find((x) => x.id === z.zone_id)); }}
+                        className="ml-auto h-6 px-2 text-[11px] text-red-600 hover:bg-red-50 gap-1"><Send size={11} /> Warn</Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
