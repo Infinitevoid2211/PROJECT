@@ -20,10 +20,14 @@ export default function EvacuationTab({
 }) {
   const [checkins, setCheckins] = useState([]);
 
+  const safeZones = Array.isArray(zones) ? zones : [];
+
   const loadCheckins = () => {
     api
       .checkins()
-      .then(setCheckins)
+      .then((data) => {
+        setCheckins(Array.isArray(data) ? data : []);
+      })
       .catch(() => setCheckins([]));
   };
 
@@ -126,7 +130,7 @@ export default function EvacuationTab({
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {zones.map((z) => {
+          {safeZones.map((z) => {
             const rk = riskOf(z.risk_level);
 
             return (
@@ -226,7 +230,7 @@ export default function EvacuationTab({
             </div>
           ) : (
             checkins.map((c) => {
-              const zone = zones.find(
+              const zone = safeZones.find(
                 (z) => z.id === c.zone_id
               );
 
@@ -302,4 +306,3 @@ export default function EvacuationTab({
     </div>
   );
 }
-

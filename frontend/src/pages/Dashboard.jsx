@@ -86,18 +86,43 @@ const StatChip = ({ image, label, value, color }) => (
 );
 
 export default function Dashboard() {
-  // Language state
   const [lang, setLang] = useState("en");
 
   const [tab, setTab] = useState("gis");
+
   const [zones, setZones] = useState([]);
+
   const [footfall, setFootfall] = useState(null);
+
   const [stats, setStats] = useState(null);
+
   const [checkinOpen, setCheckinOpen] = useState(false);
 
   const loadCore = useCallback(() => {
-    api.zones().then(setZones);
-    api.stats().then(setStats);
+    api
+      .zones()
+      .then((data) => {
+        // Always keep zones as an array.
+        // This prevents .map() / spread errors if the API
+        // returns an error object or unexpected response.
+        setZones(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        setZones([]);
+      });
+
+    api
+      .stats()
+      .then((data) => {
+        setStats(
+          data && typeof data === "object" && !Array.isArray(data)
+            ? data
+            : null
+        );
+      })
+      .catch(() => {
+        setStats(null);
+      });
   }, []);
 
   useEffect(() => {
@@ -106,7 +131,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     const tick = () => {
-      api.footfall().then(setFootfall);
+      api
+        .footfall()
+        .then((data) => {
+          setFootfall(
+            data &&
+              typeof data === "object" &&
+              !Array.isArray(data)
+              ? data
+              : null
+          );
+        })
+        .catch(() => {
+          setFootfall(null);
+        });
     };
 
     tick();
