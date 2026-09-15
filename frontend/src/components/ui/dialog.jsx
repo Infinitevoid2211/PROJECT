@@ -15,8 +15,14 @@ export function Dialog({ open = false, onOpenChange, children }) {
   );
 }
 
-export function DialogContent({ className, children, "data-testid": testId, ...props }) {
+export function DialogContent({
+  className,
+  children,
+  "data-testid": testId,
+  ...props
+}) {
   const { open, onOpenChange } = React.useContext(DialogContext);
+
   if (!open) return null;
 
   return (
@@ -26,6 +32,7 @@ export function DialogContent({ className, children, "data-testid": testId, ...p
         className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
         onClick={() => onOpenChange && onOpenChange(false)}
       />
+
       {/* Modal Dialog */}
       <div
         data-testid={testId}
@@ -44,6 +51,7 @@ export function DialogContent({ className, children, "data-testid": testId, ...p
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
+
         {children}
       </div>
     </div>
@@ -52,19 +60,37 @@ export function DialogContent({ className, children, "data-testid": testId, ...p
 
 export function DialogHeader({ className, ...props }) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 text-left mb-4", className)} {...props} />
+    <div
+      className={cn(
+        "flex flex-col space-y-1.5 text-left mb-4",
+        className
+      )}
+      {...props}
+    />
   );
 }
 
-export function DialogTitle({ className, ...props }) {
+export function DialogTitle({ className, children, ...props }) {
   return (
-    <h2 className={cn("text-lg font-semibold leading-none tracking-tight text-slate-900", className)} {...props} />
+    <h2
+      className={cn(
+        "text-lg font-semibold leading-none tracking-tight text-slate-900",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </h2>
   );
 }
 
-export function DialogDescription({ className, ...props }) {
+export function DialogDescription({ className, children, ...props }) {
   return (
-    <p className={cn("text-sm text-slate-500", className)} {...props} />
+    <p
+      className={cn("text-sm text-slate-500", className)}
+      {...props}
+    >
+      {children}
+    </p>
   );
 }
-

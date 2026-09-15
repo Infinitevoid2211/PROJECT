@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { RadialGlowButton } from "../components/ui/radial-glow-button";
 import TextAnimation from "../components/ui/staggerText";
 import CheckinModal from "../components/CheckinModal";
 import AIAssistant from "../components/AIAssistant";
