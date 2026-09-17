@@ -72,7 +72,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Production Vercel URL
         "https://project-hackafire.vercel.app",
+
+        # Current Vercel deployment URL
+        "https://project-afatw7zx0-hackafire.vercel.app",
+
+        # Local development
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ],
@@ -334,10 +340,12 @@ async def seed():
 @api_router.get("/zones")
 async def get_zones():
     zones = await db.zones.find({}, {"_id": 0}).to_list(100)
+
     zones.sort(
         key=lambda z: RISK_ORDER.get(z["risk_level"], 0),
         reverse=True
     )
+
     return zones
 
 
@@ -398,6 +406,7 @@ async def footfall():
         })
 
     checkins = await db.checkins.count_documents({})
+
     need_evac = await db.checkins.count_documents({
         "status": "NEED_EVACUATION"
     })
