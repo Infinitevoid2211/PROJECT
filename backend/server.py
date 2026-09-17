@@ -15,7 +15,12 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 
 try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+    from emergentintegrations.llm.chat import (
+        LlmChat,
+        UserMessage,
+        TextDelta,
+        StreamDone,
+    )
 except ImportError:
     # Graceful fallback if emergentintegrations package is not installed
     class UserMessage:
@@ -48,23 +53,39 @@ except ImportError:
 
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ["DB_NAME"]]
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 
 app = FastAPI(
     title="BHU-RAKSHAK AI — Landslide Early Warning (SIH26001)"
+)
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://project-hackafire.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
@@ -352,6 +373,7 @@ async def footfall():
         )
 
         delta = random.randint(-5, 8)
+
         vehicles = int(
             people * random.uniform(0.18, 0.32)
         )
@@ -462,6 +484,7 @@ async def sensors(zone_id: str):
 
         points.append({
             "time": t.strftime("%H:%M"),
+
             "soil_moisture": round(
                 min(
                     100,
@@ -474,6 +497,7 @@ async def sensors(zone_id: str):
                 ),
                 1
             ),
+
             "rainfall_mm": round(
                 max(
                     0,
@@ -483,6 +507,7 @@ async def sensors(zone_id: str):
                 ),
                 1
             ),
+
             "pore_pressure": round(
                 min(
                     100,
@@ -495,6 +520,7 @@ async def sensors(zone_id: str):
                 ),
                 1
             ),
+
             "displacement_mm": round(
                 max(
                     0,
@@ -628,10 +654,13 @@ def analyse_crack(
 
     if crack_width > 35 or displacement > 75:
         severity = "CRITICAL"
+
     elif crack_width > 20 or displacement > 55:
         severity = "HIGH"
+
     elif crack_width > 10:
         severity = "MODERATE"
+
     else:
         severity = "LOW"
 
@@ -832,7 +861,7 @@ async def ai_chat(req: ChatRequest):
 
     system = await build_system_prompt()
 
-    # include short prior context
+    # Include short prior context
     prior = await db.chat_messages.find(
         {"session_id": req.session_id},
         {"_id": 0}
@@ -937,19 +966,8 @@ app.include_router(api_router)
 
 
 # ---------------------------------------------------------------------------
-# CORS
+# Shutdown
 # ---------------------------------------------------------------------------
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://hackafire1.vercel.app",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
