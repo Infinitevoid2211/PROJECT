@@ -72,10 +72,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Production Vercel URL
-        "https://project-hackafire.vercel.app",
+        # Current production Vercel website
+        "https://hackafire.vercel.app",
 
-        # Current Vercel deployment URL
+        # Previous Vercel URLs
+        "https://project-hackafire.vercel.app",
         "https://project-afatw7zx0-hackafire.vercel.app",
 
         # Local development
