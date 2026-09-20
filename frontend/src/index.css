@@ -79,3 +79,15 @@ body {
 
 .tick-marquee { animation: marquee 28s linear infinite; }
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* =========================================
+   BHU-RAKSHAK 3D MAP GPS MARKERS
+   ========================================= */
+
+.gps-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  border: 1px solid white;
+  box-shadow: 0 0 8px currentColor;
+  pointer-events: none;
+}
