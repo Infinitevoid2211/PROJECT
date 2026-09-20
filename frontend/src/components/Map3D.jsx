@@ -6,6 +6,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 const BASE_STYLE_URL =
   "https://tiles.openfreemap.org/styles/liberty";
 
+/* =========================
+   3D TERRAIN SOURCE
+========================= */
+
 const TERRAIN_SOURCE = {
   type: "raster-dem",
   tiles: [
@@ -16,9 +20,30 @@ const TERRAIN_SOURCE = {
   maxzoom: 15,
 };
 
+/* =========================
+   HILLSHADE SOURCE
+========================= */
+
+const HILLSHADE_SOURCE = {
+  type: "raster-dem",
+  tiles: [
+    "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png",
+  ],
+  encoding: "terrarium",
+  tileSize: 256,
+  maxzoom: 15,
+};
+
+/* =========================
+   SAFE NUMBER CONVERSION
+========================= */
+
 const toNumber = (value, fallback = 0) => {
   const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+
+  return Number.isFinite(number)
+    ? number
+    : fallback;
 };
 
 export default function Map3D({
@@ -37,6 +62,10 @@ export default function Map3D({
   useEffect(() => {
     onSelectZoneRef.current = onSelectZone;
   }, [onSelectZone]);
+
+  /* =========================
+     RENDER RISK ZONES
+  ========================= */
 
   const renderZones = () => {
     const map = mapRef.current;
@@ -66,25 +95,41 @@ export default function Map3D({
           id: zone.id,
           name: zone.name || "Unknown zone",
           risk: zone.risk_level || "LOW",
-          color: riskOf(zone.risk_level || "LOW").color,
+          color: riskOf(
+            zone.risk_level || "LOW"
+          ).color,
           prob: zone.probability,
         },
         geometry: {
           type: "Point",
-          coordinates: [zone.lng, zone.lat],
+          coordinates: [
+            zone.lng,
+            zone.lat,
+          ],
         },
       })),
     };
 
+    /* Update existing source */
+
     if (map.getSource("zones")) {
-      map.getSource("zones").setData(featureCollection);
+      map
+        .getSource("zones")
+        .setData(featureCollection);
+
       return;
     }
+
+    /* Create zone source */
 
     map.addSource("zones", {
       type: "geojson",
       data: featureCollection,
     });
+
+    /* =========================
+       ZONE HALO
+    ========================= */
 
     map.addLayer({
       id: "zone-halo",
@@ -106,6 +151,10 @@ export default function Map3D({
       },
     });
 
+    /* =========================
+       ZONE CORE
+    ========================= */
+
     map.addLayer({
       id: "zone-core",
       type: "circle",
@@ -117,6 +166,10 @@ export default function Map3D({
         "circle-stroke-color": "#ffffff",
       },
     });
+
+    /* =========================
+       ZONE LABEL
+    ========================= */
 
     map.addLayer({
       id: "zone-label",
@@ -135,6 +188,10 @@ export default function Map3D({
       },
     });
 
+    /* =========================
+       ZONE CLICK
+    ========================= */
+
     map.on("click", "zone-core", (event) => {
       const feature = event.features?.[0];
 
@@ -142,39 +199,68 @@ export default function Map3D({
         return;
       }
 
-      const zoneId = feature.properties?.id;
+      const zoneId =
+        feature.properties?.id;
 
-      if (zoneId && onSelectZoneRef.current) {
+      if (
+        zoneId &&
+        onSelectZoneRef.current
+      ) {
         onSelectZoneRef.current(zoneId);
       }
     });
 
-    map.on("mouseenter", "zone-core", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
+    map.on(
+      "mouseenter",
+      "zone-core",
+      () => {
+        map.getCanvas().style.cursor =
+          "pointer";
+      }
+    );
 
-    map.on("mouseleave", "zone-core", () => {
-      map.getCanvas().style.cursor = "";
-    });
+    map.on(
+      "mouseleave",
+      "zone-core",
+      () => {
+        map.getCanvas().style.cursor =
+          "";
+      }
+    );
   };
 
+  /* =========================
+     CREATE MAP
+  ========================= */
+
   useEffect(() => {
-    if (mapRef.current || !ref.current) {
+    if (
+      mapRef.current ||
+      !ref.current
+    ) {
       return;
     }
 
     const map = new maplibregl.Map({
       container: ref.current,
       style: BASE_STYLE_URL,
-      center: [92.7176, 23.7271],
+
+      center: [
+        92.7176,
+        23.7271,
+      ],
+
       zoom: 12.4,
       pitch: 62,
       bearing: -18,
       maxPitch: 80,
+
       attributionControl: false,
     });
 
     mapRef.current = map;
+
+    /* Navigation */
 
     map.addControl(
       new maplibregl.NavigationControl({
@@ -183,33 +269,76 @@ export default function Map3D({
       "top-right"
     );
 
+    /* Attribution */
+
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true,
       })
     );
 
+    /* =========================
+       MAP LOAD
+    ========================= */
+
     map.on("load", () => {
-      if (!map.getSource("bhu-terrain")) {
-        map.addSource("bhu-terrain", TERRAIN_SOURCE);
+      /* =========================
+         3D TERRAIN SOURCE
+      ========================= */
+
+      if (
+        !map.getSource("bhu-terrain")
+      ) {
+        map.addSource(
+          "bhu-terrain",
+          TERRAIN_SOURCE
+        );
       }
 
-      if (!map.getLayer("bhu-hillshade")) {
-        const firstOverlayLayer = map
-          .getStyle()
-          .layers?.find(
-            (layer) =>
-              layer.type === "line" ||
-              layer.type === "symbol"
-          );
+      /* =========================
+         SEPARATE HILLSHADE SOURCE
+      ========================= */
+
+      if (
+        !map.getSource(
+          "bhu-hillshade-terrain"
+        )
+      ) {
+        map.addSource(
+          "bhu-hillshade-terrain",
+          HILLSHADE_SOURCE
+        );
+      }
+
+      /* =========================
+         HILLSHADE LAYER
+      ========================= */
+
+      if (
+        !map.getLayer("bhu-hillshade")
+      ) {
+        const firstOverlayLayer =
+          map
+            .getStyle()
+            .layers?.find(
+              (layer) =>
+                layer.type === "line" ||
+                layer.type === "symbol"
+            );
 
         const hillshadeLayer = {
           id: "bhu-hillshade",
           type: "hillshade",
-          source: "bhu-terrain",
+
+          /* IMPORTANT:
+             Separate source from 3D terrain */
+          source:
+            "bhu-hillshade-terrain",
+
           paint: {
             "hillshade-exaggeration": 0.55,
-            "hillshade-shadow-color": "#334155",
+            "hillshade-shadow-color":
+              "#334155",
           },
         };
 
@@ -219,14 +348,24 @@ export default function Map3D({
             firstOverlayLayer.id
           );
         } else {
-          map.addLayer(hillshadeLayer);
+          map.addLayer(
+            hillshadeLayer
+          );
         }
       }
+
+      /* =========================
+         3D TERRAIN
+      ========================= */
 
       map.setTerrain({
         source: "bhu-terrain",
         exaggeration: 1.6,
       });
+
+      /* =========================
+         SKY / FOG
+      ========================= */
 
       map.setSky({
         "sky-color": "#a9c9e8",
@@ -242,21 +381,32 @@ export default function Map3D({
       renderZones();
     });
 
+    /* =========================
+       CLEANUP
+    ========================= */
+
     return () => {
       ready.current = false;
 
-      gpsMarkers.current.forEach((marker) => {
-        marker.remove();
-      });
+      gpsMarkers.current.forEach(
+        (marker) => {
+          marker.remove();
+        }
+      );
 
       gpsMarkers.current = [];
 
       map.remove();
+
       mapRef.current = null;
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* =========================
+     UPDATE ZONES
+  ========================= */
 
   useEffect(() => {
     renderZones();
@@ -264,21 +414,32 @@ export default function Map3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones]);
 
+  /* =========================
+     HEATMAP TOGGLE
+  ========================= */
+
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !ready.current) {
+    if (
+      !map ||
+      !ready.current
+    ) {
       return;
     }
 
-    if (!map.getLayer("zone-halo")) {
+    if (
+      !map.getLayer("zone-halo")
+    ) {
       return;
     }
 
     map.setPaintProperty(
       "zone-halo",
       "circle-opacity",
-      showHeatmap ? 0.42 : 0.22
+      showHeatmap
+        ? 0.42
+        : 0.22
     );
 
     map.setPaintProperty(
@@ -306,82 +467,157 @@ export default function Map3D({
     );
   }, [showHeatmap]);
 
+  /* =========================
+     GPS FOOTFALL DOTS
+  ========================= */
+
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !ready.current || !footfall?.zones) {
+    if (
+      !map ||
+      !ready.current ||
+      !footfall?.zones
+    ) {
       return;
     }
 
-    gpsMarkers.current.forEach((marker) => {
-      marker.remove();
-    });
+    /* Remove old markers */
+
+    gpsMarkers.current.forEach(
+      (marker) => {
+        marker.remove();
+      }
+    );
 
     gpsMarkers.current = [];
 
-    footfall.zones.forEach((zone) => {
-      const lat = toNumber(zone.lat, null);
-      const lng = toNumber(zone.lng, null);
-      const people = toNumber(zone.people_in_zone, 0);
+    /* Create new markers */
 
-      if (lat === null || lng === null) {
-        return;
+    footfall.zones.forEach(
+      (zone) => {
+        const lat = toNumber(
+          zone.lat,
+          null
+        );
+
+        const lng = toNumber(
+          zone.lng,
+          null
+        );
+
+        const people =
+          toNumber(
+            zone.people_in_zone,
+            0
+          );
+
+        if (
+          lat === null ||
+          lng === null
+        ) {
+          return;
+        }
+
+        const markerCount =
+          Math.min(
+            14,
+            Math.max(
+              3,
+              Math.round(
+                people / 12
+              )
+            )
+          );
+
+        const color =
+          riskOf(
+            zone.risk_level ||
+              "LOW"
+          ).color;
+
+        for (
+          let i = 0;
+          i < markerCount;
+          i++
+        ) {
+          const element =
+            document.createElement(
+              "div"
+            );
+
+          element.className =
+            "gps-dot";
+
+          element.style.background =
+            color;
+
+          const jitteredLat =
+            lat +
+            (Math.random() - 0.5) *
+              0.012;
+
+          const jitteredLng =
+            lng +
+            (Math.random() - 0.5) *
+              0.012;
+
+          const marker =
+            new maplibregl.Marker({
+              element,
+            })
+              .setLngLat([
+                jitteredLng,
+                jitteredLat,
+              ])
+              .addTo(map);
+
+          gpsMarkers.current.push(
+            marker
+          );
+        }
       }
-
-      const markerCount = Math.min(
-        14,
-        Math.max(
-          3,
-          Math.round(people / 12)
-        )
-      );
-
-      const color = riskOf(
-        zone.risk_level || "LOW"
-      ).color;
-
-      for (let i = 0; i < markerCount; i++) {
-        const element = document.createElement("div");
-
-        element.className = "gps-dot";
-        element.style.background = color;
-
-        const jitteredLat =
-          lat + (Math.random() - 0.5) * 0.012;
-
-        const jitteredLng =
-          lng + (Math.random() - 0.5) * 0.012;
-
-        const marker = new maplibregl.Marker({
-          element,
-        })
-          .setLngLat([
-            jitteredLng,
-            jitteredLat,
-          ])
-          .addTo(map);
-
-        gpsMarkers.current.push(marker);
-      }
-    });
+    );
   }, [footfall]);
+
+  /* =========================
+     FOCUS SELECTED ZONE
+  ========================= */
 
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !ready.current || !focusZone) {
+    if (
+      !map ||
+      !ready.current ||
+      !focusZone
+    ) {
       return;
     }
 
-    const lat = toNumber(focusZone.lat, null);
-    const lng = toNumber(focusZone.lng, null);
+    const lat = toNumber(
+      focusZone.lat,
+      null
+    );
 
-    if (lat === null || lng === null) {
+    const lng = toNumber(
+      focusZone.lng,
+      null
+    );
+
+    if (
+      lat === null ||
+      lng === null
+    ) {
       return;
     }
 
     map.flyTo({
-      center: [lng, lat],
+      center: [
+        lng,
+        lat,
+      ],
+
       zoom: 14.5,
       pitch: 68,
       bearing: -18,
