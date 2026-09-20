@@ -16,6 +16,11 @@ const TERRAIN_SOURCE = {
   maxzoom: 15,
 };
 
+const toNumber = (value, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
 export default function Map3D({
   zones,
   footfall,
@@ -40,15 +45,28 @@ export default function Map3D({
       return;
     }
 
+    const validZones = zones
+      .map((zone) => ({
+        ...zone,
+        lat: toNumber(zone.lat, null),
+        lng: toNumber(zone.lng, null),
+        probability: toNumber(zone.probability, 0),
+      }))
+      .filter(
+        (zone) =>
+          zone.lat !== null &&
+          zone.lng !== null
+      );
+
     const featureCollection = {
       type: "FeatureCollection",
-      features: zones.map((zone) => ({
+      features: validZones.map((zone) => ({
         type: "Feature",
         properties: {
           id: zone.id,
-          name: zone.name,
-          risk: zone.risk_level,
-          color: riskOf(zone.risk_level).color,
+          name: zone.name || "Unknown zone",
+          risk: zone.risk_level || "LOW",
+          color: riskOf(zone.risk_level || "LOW").color,
           prob: zone.probability,
         },
         geometry: {
@@ -302,15 +320,25 @@ export default function Map3D({
     gpsMarkers.current = [];
 
     footfall.zones.forEach((zone) => {
+      const lat = toNumber(zone.lat, null);
+      const lng = toNumber(zone.lng, null);
+      const people = toNumber(zone.people_in_zone, 0);
+
+      if (lat === null || lng === null) {
+        return;
+      }
+
       const markerCount = Math.min(
         14,
         Math.max(
           3,
-          Math.round(zone.people_in_zone / 12)
+          Math.round(people / 12)
         )
       );
 
-      const color = riskOf(zone.risk_level).color;
+      const color = riskOf(
+        zone.risk_level || "LOW"
+      ).color;
 
       for (let i = 0; i < markerCount; i++) {
         const element = document.createElement("div");
@@ -319,10 +347,10 @@ export default function Map3D({
         element.style.background = color;
 
         const jitteredLat =
-          zone.lat + (Math.random() - 0.5) * 0.012;
+          lat + (Math.random() - 0.5) * 0.012;
 
         const jitteredLng =
-          zone.lng + (Math.random() - 0.5) * 0.012;
+          lng + (Math.random() - 0.5) * 0.012;
 
         const marker = new maplibregl.Marker({
           element,
@@ -345,11 +373,15 @@ export default function Map3D({
       return;
     }
 
+    const lat = toNumber(focusZone.lat, null);
+    const lng = toNumber(focusZone.lng, null);
+
+    if (lat === null || lng === null) {
+      return;
+    }
+
     map.flyTo({
-      center: [
-        focusZone.lng,
-        focusZone.lat,
-      ],
+      center: [lng, lat],
       zoom: 14.5,
       pitch: 68,
       bearing: -18,
