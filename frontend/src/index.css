@@ -67,10 +67,6 @@ body {
 }
 .fade-up { animation: fade-up 0.4s ease-out both; }
 
-.gps-dot {
-    width: 10px; height: 10px; border-radius: 999px;
-    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.4);
-}
 .maplibregl-popup-content {
     border-radius: 12px; padding: 12px 14px; font-family: 'IBM Plex Sans', sans-serif;
     box-shadow: 0 10px 30px -8px rgba(0,0,0,0.3);
