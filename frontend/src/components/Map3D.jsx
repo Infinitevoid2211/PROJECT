@@ -2,41 +2,16 @@ import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { riskOf } from "@/lib/constants";
 
-// Token-free style: OpenTopoMap raster base + AWS Terrarium DEM for real 3D terrain.
-const STYLE = {
-  version: 8,
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources: {
-    topo: {
-      type: "raster",
-      tiles: [
-        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      maxzoom: 17,
-      attribution: "© OpenTopoMap · © OpenStreetMap contributors",
-    },
-    terrain: {
-      type: "raster-dem",
-      tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
-      encoding: "terrarium",
-      tileSize: 256,
-      maxzoom: 15,
-    },
-  },
-  layers: [
-    { id: "bg", type: "background", paint: { "background-color": "#eef2f4" } },
-    { id: "topo", type: "raster", source: "topo", paint: { "raster-opacity": 0.95 } },
-    {
-      id: "hills",
-      type: "hillshade",
-      source: "terrain",
-      paint: { "hillshade-exaggeration": 0.55, "hillshade-shadow-color": "#334155" },
-    },
-  ],
-  terrain: { source: "terrain", exaggeration: 1.6 },
+// OpenFreeMap provides a high-resolution, token-free vector basemap (Liberty style)
+// with roads, buildings, place names and topographic boundaries.
+// AWS Terrarium DEM provides real-time 3D elevation and hillshading.
+const BASE_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const TERRAIN_SOURCE = {
+  type: "raster-dem",
+  tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
+  encoding: "terrarium",
+  tileSize: 256,
+  maxzoom: 15,
 };
 
 const INSAR_POINTS = [
@@ -59,7 +34,7 @@ export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, show
     if (mapRef.current) return;
     const map = new maplibregl.Map({
       container: ref.current,
-      style: STYLE,
+      style: BASE_STYLE_URL,
       center: [92.7176, 23.7271],
       zoom: 12.4,
       pitch: 62,
@@ -72,6 +47,34 @@ export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, show
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     map.on("load", () => {
+      // Add AWS Terrarium 3D elevation source after OpenFreeMap vector style loads
+      if (!map.getSource("bhu-terrain")) {
+        map.addSource("bhu-terrain", TERRAIN_SOURCE);
+      }
+      if (!map.getLayer("bhu-hillshade")) {
+        const firstOverlayLayer = map
+          .getStyle()
+          .layers
+          ?.find((layer) => layer.type === "line" || layer.type === "symbol");
+
+        const hillshadeLayer = {
+          id: "bhu-hillshade",
+          type: "hillshade",
+          source: "bhu-terrain",
+          paint: {
+            "hillshade-exaggeration": 0.55,
+            "hillshade-shadow-color": "#334155",
+          },
+        };
+
+        if (firstOverlayLayer) {
+          map.addLayer(hillshadeLayer, firstOverlayLayer.id);
+        } else {
+          map.addLayer(hillshadeLayer);
+        }
+      }
+      map.setTerrain({ source: "bhu-terrain", exaggeration: 1.6 });
+
       map.setSky({
         "sky-color": "#a9c9e8",
         "sky-horizon-blend": 0.6,
@@ -80,6 +83,7 @@ export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, show
         "fog-color": "#eef2f4",
         "fog-ground-blend": 0.4,
       });
+
       ready.current = true;
       renderZones();
       renderInSAR();
@@ -174,9 +178,11 @@ export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, show
         const props = e.features[0].properties;
         new maplibregl.Popup()
           .setLngLat(e.lngLat)
-          .setHTML(`<div class="p-1 font-mono text-xs"><b>Sentinel-1 InSAR</b><br/>${props.status}</div>`)
+          .setHTML(`<div class="p-1.5 font-mono text-xs"><b>Sentinel-1 InSAR Satellite Creep</b><br/><span class="text-rose-600 font-semibold">${props.status}</span></div>`)
           .addTo(map);
       });
+      map.on("mouseenter", "insar-points", () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", "insar-points", () => (map.getCanvas().style.cursor = ""));
     }
   };
 
@@ -227,6 +233,5 @@ export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, show
     map.flyTo({ center: [focusZone.lng, focusZone.lat], zoom: 14.5, pitch: 68, bearing: -18, duration: 1600 });
   }, [focusZone]);
 
-  return <div ref={ref} data-testid="map-3d-canvas" className="w-full h-full rounded-xl overflow-hidden" />;
+  return <div ref={ref} data-testid="map-3d-canvas" className="w-full h-full rounded-xl overflow-hidden shadow-inner" />;
 }
-

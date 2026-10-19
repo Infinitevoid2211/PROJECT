@@ -84,7 +84,7 @@ BHU-RAKSHAK AI couples geotechnical physical laws with modern AI reasoning acros
      $$F_s = \frac{c' + (\gamma z \cos^2\beta - u)\tan\phi'}{\gamma z \sin\beta \cos\beta}$$
      *(Limit equilibrium failure triggered when $F_s < 1.0$)*.
 4. **Sentinel-1 InSAR Satellite Creep Layer**: European Space Agency (ESA) radar interferometry measuring millimeter-scale slope subsidence ($-5$ to $-30\text{ mm/year}$) before surface rupture.
-5. **Interactive 3D GIS & GPS Telemetry**: Real-time simulated pedestrian and vehicular footfall telemetry visualized over a 3D terrain map (MapLibre GL + AWS Terrarium DEM).
+5. **Interactive 3D GIS & GPS Telemetry**: Real-time simulated pedestrian and vehicular footfall telemetry visualized over a 3D terrain map (MapLibre GL + OpenFreeMap Liberty vector basemap + AWS Terrarium 3D DEM hillshading).
 6. **A* Dynamic Road Evacuation Routing**: Graph routing that dynamically severs sinking highway sections (e.g. NH-54 at Hunthar Veng) and recalculates safe bypass corridors to designated relief shelters.
 7. **Tier 4 Google Gemma Disaster Protocol & Crack AI**: Reasoning and multilingual dispatch engine powered by Google Gemma through the Gemini API.
 8. **National Disaster Management Protocol (NDMA Sachet & CAP v1.2)**: Automated export of standardized ITU-T X.1303 Common Alerting Protocol XML feeds (`/api/alerts/{id}/cap.xml`).
