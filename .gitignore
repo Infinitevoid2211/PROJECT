@@ -1,25 +1,28 @@
-# Python
+# Environments & Dependencies
 .venv/
+env/
 venv/
+node_modules/
+dist/
+build/
+
+# Byte-compiled / cache files
 __pycache__/
 *.py[cod]
+*$py.class
+.cache/
 
-# Node / React
-node_modules/
-frontend/node_modules/
-frontend/build/
+# Environment configurations
+*.env
+backend/.env
+frontend/.env
+!*.env.example
 
-# Environment variables / secrets
-.env
-.env.*
-!.env.example
-
-# Logs
-*.log
-
-# VS Code
-.vscode/
-
-# OS files
+# OS & Editor generated files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+~$*.docx
+

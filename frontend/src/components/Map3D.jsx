@@ -1,372 +1,77 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { riskOf } from "@/lib/constants";
-import "maplibre-gl/dist/maplibre-gl.css";
 
-const BASE_STYLE_URL =
-  "https://tiles.openfreemap.org/styles/liberty";
-
-/* =========================
-   3D TERRAIN SOURCE
-========================= */
-
-const TERRAIN_SOURCE = {
-  type: "raster-dem",
-  tiles: [
-    "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png",
+// Token-free style: OpenTopoMap raster base + AWS Terrarium DEM for real 3D terrain.
+const STYLE = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sources: {
+    topo: {
+      type: "raster",
+      tiles: [
+        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      maxzoom: 17,
+      attribution: "© OpenTopoMap · © OpenStreetMap contributors",
+    },
+    terrain: {
+      type: "raster-dem",
+      tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
+      encoding: "terrarium",
+      tileSize: 256,
+      maxzoom: 15,
+    },
+  },
+  layers: [
+    { id: "bg", type: "background", paint: { "background-color": "#eef2f4" } },
+    { id: "topo", type: "raster", source: "topo", paint: { "raster-opacity": 0.95 } },
+    {
+      id: "hills",
+      type: "hillshade",
+      source: "terrain",
+      paint: { "hillshade-exaggeration": 0.55, "hillshade-shadow-color": "#334155" },
+    },
   ],
-  encoding: "terrarium",
-  tileSize: 256,
-  maxzoom: 15,
+  terrain: { source: "terrain", exaggeration: 1.6 },
 };
 
-/* =========================
-   HILLSHADE SOURCE
-========================= */
+const INSAR_POINTS = [
+  { id: "sar-1", lat: 23.7431, lng: 92.7079, v: -28.4, status: "Accelerated Subsidence (-28.4 mm/yr)" },
+  { id: "sar-2", lat: 23.7425, lng: 92.7090, v: -24.1, status: "Active Shear Creep (-24.1 mm/yr)" },
+  { id: "sar-3", lat: 23.7545, lng: 92.7308, v: -16.8, status: "Creeping Deformation (-16.8 mm/yr)" },
+  { id: "sar-4", lat: 23.7538, lng: 92.7319, v: -13.2, status: "Creeping Deformation (-13.2 mm/yr)" },
+  { id: "sar-5", lat: 23.7392, lng: 92.7192, v: -7.5, status: "Minor Settlement (-7.5 mm/yr)" },
+  { id: "sar-6", lat: 23.7654, lng: 92.6845, v: -18.2, status: "Active Shear Creep (-18.2 mm/yr)" },
+  { id: "sar-7", lat: 23.7605, lng: 92.7248, v: -2.1, status: "Stable (-2.1 mm/yr)" },
+];
 
-const HILLSHADE_SOURCE = {
-  type: "raster-dem",
-  tiles: [
-    "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png",
-  ],
-  encoding: "terrarium",
-  tileSize: 256,
-  maxzoom: 15,
-};
-
-/* =========================
-   SAFE NUMBER CONVERSION
-========================= */
-
-const toNumber = (value, fallback = 0) => {
-  const number = Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : fallback;
-};
-
-export default function Map3D({
-  zones,
-  footfall,
-  onSelectZone,
-  showHeatmap,
-  focusZone,
-}) {
+export default function Map3D({ zones, footfall, onSelectZone, showHeatmap, showInSAR, focusZone }) {
   const ref = useRef(null);
   const mapRef = useRef(null);
   const gpsMarkers = useRef([]);
   const ready = useRef(false);
-  const onSelectZoneRef = useRef(onSelectZone);
 
   useEffect(() => {
-    onSelectZoneRef.current = onSelectZone;
-  }, [onSelectZone]);
-
-  /* =========================
-     RENDER RISK ZONES
-  ========================= */
-
-  const renderZones = () => {
-    const map = mapRef.current;
-
-    if (!map || !ready.current || !zones?.length) {
-      return;
-    }
-
-    const validZones = zones
-      .map((zone) => ({
-        ...zone,
-        lat: toNumber(zone.lat, null),
-        lng: toNumber(zone.lng, null),
-        probability: toNumber(zone.probability, 0),
-      }))
-      .filter(
-        (zone) =>
-          zone.lat !== null &&
-          zone.lng !== null
-      );
-
-    const featureCollection = {
-      type: "FeatureCollection",
-      features: validZones.map((zone) => ({
-        type: "Feature",
-        properties: {
-          id: zone.id,
-          name: zone.name || "Unknown zone",
-          risk: zone.risk_level || "LOW",
-          color: riskOf(
-            zone.risk_level || "LOW"
-          ).color,
-          prob: zone.probability,
-        },
-        geometry: {
-          type: "Point",
-          coordinates: [
-            zone.lng,
-            zone.lat,
-          ],
-        },
-      })),
-    };
-
-    /* Update existing source */
-
-    if (map.getSource("zones")) {
-      map
-        .getSource("zones")
-        .setData(featureCollection);
-
-      return;
-    }
-
-    /* Create zone source */
-
-    map.addSource("zones", {
-      type: "geojson",
-      data: featureCollection,
-    });
-
-    /* =========================
-       ZONE HALO
-    ========================= */
-
-    map.addLayer({
-      id: "zone-halo",
-      type: "circle",
-      source: "zones",
-      paint: {
-        "circle-radius": [
-          "interpolate",
-          ["linear"],
-          ["get", "prob"],
-          20,
-          24,
-          90,
-          60,
-        ],
-        "circle-color": ["get", "color"],
-        "circle-opacity": 0.22,
-        "circle-blur": 0.6,
-      },
-    });
-
-    /* =========================
-       ZONE CORE
-    ========================= */
-
-    map.addLayer({
-      id: "zone-core",
-      type: "circle",
-      source: "zones",
-      paint: {
-        "circle-radius": 8,
-        "circle-color": ["get", "color"],
-        "circle-stroke-width": 2.5,
-        "circle-stroke-color": "#ffffff",
-      },
-    });
-
-    /* =========================
-       ZONE LABEL
-    ========================= */
-
-    map.addLayer({
-      id: "zone-label",
-      type: "symbol",
-      source: "zones",
-      layout: {
-        "text-field": ["get", "name"],
-        "text-size": 11,
-        "text-offset": [0, 1.6],
-        "text-anchor": "top",
-      },
-      paint: {
-        "text-color": "#0f172a",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 1.6,
-      },
-    });
-
-    /* =========================
-       ZONE CLICK
-    ========================= */
-
-    map.on("click", "zone-core", (event) => {
-      const feature = event.features?.[0];
-
-      if (!feature) {
-        return;
-      }
-
-      const zoneId =
-        feature.properties?.id;
-
-      if (
-        zoneId &&
-        onSelectZoneRef.current
-      ) {
-        onSelectZoneRef.current(zoneId);
-      }
-    });
-
-    map.on(
-      "mouseenter",
-      "zone-core",
-      () => {
-        map.getCanvas().style.cursor =
-          "pointer";
-      }
-    );
-
-    map.on(
-      "mouseleave",
-      "zone-core",
-      () => {
-        map.getCanvas().style.cursor =
-          "";
-      }
-    );
-  };
-
-  /* =========================
-     CREATE MAP
-  ========================= */
-
-  useEffect(() => {
-    if (
-      mapRef.current ||
-      !ref.current
-    ) {
-      return;
-    }
-
+    if (mapRef.current) return;
     const map = new maplibregl.Map({
       container: ref.current,
-      style: BASE_STYLE_URL,
-
-      center: [
-        92.7176,
-        23.7271,
-      ],
-
+      style: STYLE,
+      center: [92.7176, 23.7271],
       zoom: 12.4,
       pitch: 62,
       bearing: -18,
       maxPitch: 80,
-
       attributionControl: false,
     });
-
     mapRef.current = map;
-
-    /* Navigation */
-
-    map.addControl(
-      new maplibregl.NavigationControl({
-        visualizePitch: true,
-      }),
-      "top-right"
-    );
-
-    /* Attribution */
-
-    map.addControl(
-      new maplibregl.AttributionControl({
-        compact: true,
-      })
-    );
-
-    /* =========================
-       MAP LOAD
-    ========================= */
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     map.on("load", () => {
-      /* =========================
-         3D TERRAIN SOURCE
-      ========================= */
-
-      if (
-        !map.getSource("bhu-terrain")
-      ) {
-        map.addSource(
-          "bhu-terrain",
-          TERRAIN_SOURCE
-        );
-      }
-
-      /* =========================
-         SEPARATE HILLSHADE SOURCE
-      ========================= */
-
-      if (
-        !map.getSource(
-          "bhu-hillshade-terrain"
-        )
-      ) {
-        map.addSource(
-          "bhu-hillshade-terrain",
-          HILLSHADE_SOURCE
-        );
-      }
-
-      /* =========================
-         HILLSHADE LAYER
-      ========================= */
-
-      if (
-        !map.getLayer("bhu-hillshade")
-      ) {
-        const firstOverlayLayer =
-          map
-            .getStyle()
-            .layers?.find(
-              (layer) =>
-                layer.type === "line" ||
-                layer.type === "symbol"
-            );
-
-        const hillshadeLayer = {
-          id: "bhu-hillshade",
-          type: "hillshade",
-
-          /* IMPORTANT:
-             Separate source from 3D terrain */
-          source:
-            "bhu-hillshade-terrain",
-
-          paint: {
-            "hillshade-exaggeration": 0.55,
-            "hillshade-shadow-color":
-              "#334155",
-          },
-        };
-
-        if (firstOverlayLayer) {
-          map.addLayer(
-            hillshadeLayer,
-            firstOverlayLayer.id
-          );
-        } else {
-          map.addLayer(
-            hillshadeLayer
-          );
-        }
-      }
-
-      /* =========================
-         3D TERRAIN
-      ========================= */
-
-      map.setTerrain({
-        source: "bhu-terrain",
-        exaggeration: 1.6,
-      });
-
-      /* =========================
-         SKY / FOG
-      ========================= */
-
       map.setSky({
         "sky-color": "#a9c9e8",
         "sky-horizon-blend": 0.6,
@@ -375,261 +80,153 @@ export default function Map3D({
         "fog-color": "#eef2f4",
         "fog-ground-blend": 0.4,
       });
-
       ready.current = true;
-
       renderZones();
+      renderInSAR();
     });
-
-    /* =========================
-       CLEANUP
-    ========================= */
-
-    return () => {
-      ready.current = false;
-
-      gpsMarkers.current.forEach(
-        (marker) => {
-          marker.remove();
-        }
-      );
-
-      gpsMarkers.current = [];
-
-      map.remove();
-
-      mapRef.current = null;
-    };
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, []);
 
-  /* =========================
-     UPDATE ZONES
-  ========================= */
+  const renderZones = () => {
+    const map = mapRef.current;
+    if (!map || !ready.current || !zones?.length) return;
 
-  useEffect(() => {
-    renderZones();
+    const fc = {
+      type: "FeatureCollection",
+      features: zones.map((z) => ({
+        type: "Feature",
+        properties: { id: z.id, name: z.name, risk: z.risk_level, color: riskOf(z.risk_level).color, prob: z.probability },
+        geometry: { type: "Point", coordinates: [z.lng, z.lat] },
+      })),
+    };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zones]);
+    if (map.getSource("zones")) {
+      map.getSource("zones").setData(fc);
+    } else {
+      map.addSource("zones", { type: "geojson", data: fc });
+      map.addLayer({
+        id: "zone-halo", type: "circle", source: "zones",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "prob"], 20, 24, 90, 60],
+          "circle-color": ["get", "color"], "circle-opacity": 0.22, "circle-blur": 0.6,
+        },
+      });
+      map.addLayer({
+        id: "zone-core", type: "circle", source: "zones",
+        paint: {
+          "circle-radius": 8, "circle-color": ["get", "color"],
+          "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff",
+        },
+      });
+      map.addLayer({
+        id: "zone-label", type: "symbol", source: "zones",
+        layout: {
+          "text-field": ["get", "name"], "text-size": 11, "text-offset": [0, 1.6],
+          "text-anchor": "top", "text-font": ["Open Sans Regular"],
+        },
+        paint: { "text-color": "#0f172a", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
+      });
 
-  /* =========================
-     HEATMAP TOGGLE
-  ========================= */
+      map.on("click", "zone-core", (e) => onSelectZone && onSelectZone(e.features[0].properties.id));
+      map.on("mouseenter", "zone-core", () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", "zone-core", () => (map.getCanvas().style.cursor = ""));
+    }
+  };
+
+  const renderInSAR = () => {
+    const map = mapRef.current;
+    if (!map || !ready.current) return;
+
+    const insarFc = {
+      type: "FeatureCollection",
+      features: INSAR_POINTS.map((p) => ({
+        type: "Feature",
+        properties: { id: p.id, status: p.status, v: p.v },
+        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      })),
+    };
+
+    if (!map.getSource("insar")) {
+      map.addSource("insar", { type: "geojson", data: insarFc });
+      map.addLayer({
+        id: "insar-points",
+        type: "circle",
+        source: "insar",
+        layout: { visibility: showInSAR ? "visible" : "none" },
+        paint: {
+          "circle-radius": 7,
+          "circle-color": [
+            "interpolate",
+            ["linear"],
+            ["get", "v"],
+            -30, "#7c3aed",
+            -18, "#dc2626",
+            -10, "#f59e0b",
+            0, "#10b981",
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+          "circle-opacity": 0.9,
+        },
+      });
+
+      map.on("click", "insar-points", (e) => {
+        const props = e.features[0].properties;
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(`<div class="p-1 font-mono text-xs"><b>Sentinel-1 InSAR</b><br/>${props.status}</div>`)
+          .addTo(map);
+      });
+    }
+  };
+
+  useEffect(() => { renderZones(); }, [zones]); // eslint-disable-line
 
   useEffect(() => {
     const map = mapRef.current;
-
-    if (
-      !map ||
-      !ready.current
-    ) {
-      return;
+    if (!map || !ready.current) return;
+    if (map.getLayer("insar-points")) {
+      map.setLayoutProperty("insar-points", "visibility", showInSAR ? "visible" : "none");
     }
+  }, [showInSAR]);
 
-    if (
-      !map.getLayer("zone-halo")
-    ) {
-      return;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready.current) return;
+    if (map.getLayer("zone-halo")) {
+      map.setPaintProperty("zone-halo", "circle-opacity", showHeatmap ? 0.42 : 0.22);
+      map.setPaintProperty("zone-halo", "circle-radius",
+        showHeatmap
+          ? ["interpolate", ["linear"], ["get", "prob"], 20, 40, 90, 110]
+          : ["interpolate", ["linear"], ["get", "prob"], 20, 24, 90, 60]);
     }
-
-    map.setPaintProperty(
-      "zone-halo",
-      "circle-opacity",
-      showHeatmap
-        ? 0.42
-        : 0.22
-    );
-
-    map.setPaintProperty(
-      "zone-halo",
-      "circle-radius",
-      showHeatmap
-        ? [
-            "interpolate",
-            ["linear"],
-            ["get", "prob"],
-            20,
-            40,
-            90,
-            110,
-          ]
-        : [
-            "interpolate",
-            ["linear"],
-            ["get", "prob"],
-            20,
-            24,
-            90,
-            60,
-          ]
-    );
   }, [showHeatmap]);
 
-  /* =========================
-     GPS FOOTFALL DOTS
-  ========================= */
-
   useEffect(() => {
     const map = mapRef.current;
-
-    if (
-      !map ||
-      !ready.current ||
-      !footfall?.zones
-    ) {
-      return;
-    }
-
-    /* Remove old markers */
-
-    gpsMarkers.current.forEach(
-      (marker) => {
-        marker.remove();
-      }
-    );
-
+    if (!map || !ready.current || !footfall?.zones) return;
+    gpsMarkers.current.forEach((m) => m.remove());
     gpsMarkers.current = [];
-
-    /* Create new markers */
-
-    footfall.zones.forEach(
-      (zone) => {
-        const lat = toNumber(
-          zone.lat,
-          null
-        );
-
-        const lng = toNumber(
-          zone.lng,
-          null
-        );
-
-        const people =
-          toNumber(
-            zone.people_in_zone,
-            0
-          );
-
-        if (
-          lat === null ||
-          lng === null
-        ) {
-          return;
-        }
-
-        const markerCount =
-          Math.min(
-            14,
-            Math.max(
-              3,
-              Math.round(
-                people / 12
-              )
-            )
-          );
-
-        const color =
-          riskOf(
-            zone.risk_level ||
-              "LOW"
-          ).color;
-
-        for (
-          let i = 0;
-          i < markerCount;
-          i++
-        ) {
-          const element =
-            document.createElement(
-              "div"
-            );
-
-          element.className =
-            "gps-dot";
-
-          element.style.background =
-            color;
-
-          const jitteredLat =
-            lat +
-            (Math.random() - 0.5) *
-              0.012;
-
-          const jitteredLng =
-            lng +
-            (Math.random() - 0.5) *
-              0.012;
-
-          const marker =
-            new maplibregl.Marker({
-              element,
-            })
-              .setLngLat([
-                jitteredLng,
-                jitteredLat,
-              ])
-              .addTo(map);
-
-          gpsMarkers.current.push(
-            marker
-          );
-        }
+    footfall.zones.forEach((z) => {
+      const n = Math.min(14, Math.max(3, Math.round(z.people_in_zone / 12)));
+      const color = riskOf(z.risk_level).color;
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement("div");
+        el.className = "gps-dot";
+        el.style.background = color;
+        const jLat = z.lat + (Math.random() - 0.5) * 0.012;
+        const jLng = z.lng + (Math.random() - 0.5) * 0.012;
+        gpsMarkers.current.push(new maplibregl.Marker({ element: el }).setLngLat([jLng, jLat]).addTo(map));
       }
-    );
+    });
   }, [footfall]);
 
-  /* =========================
-     FOCUS SELECTED ZONE
-  ========================= */
-
   useEffect(() => {
     const map = mapRef.current;
-
-    if (
-      !map ||
-      !ready.current ||
-      !focusZone
-    ) {
-      return;
-    }
-
-    const lat = toNumber(
-      focusZone.lat,
-      null
-    );
-
-    const lng = toNumber(
-      focusZone.lng,
-      null
-    );
-
-    if (
-      lat === null ||
-      lng === null
-    ) {
-      return;
-    }
-
-    map.flyTo({
-      center: [
-        lng,
-        lat,
-      ],
-
-      zoom: 14.5,
-      pitch: 68,
-      bearing: -18,
-      duration: 1600,
-    });
+    if (!map || !ready.current || !focusZone) return;
+    map.flyTo({ center: [focusZone.lng, focusZone.lat], zoom: 14.5, pitch: 68, bearing: -18, duration: 1600 });
   }, [focusZone]);
 
-  return (
-    <div
-      ref={ref}
-      data-testid="map-3d-canvas"
-      className="w-full h-full rounded-xl overflow-hidden"
-    />
-  );
+  return <div ref={ref} data-testid="map-3d-canvas" className="w-full h-full rounded-xl overflow-hidden" />;
 }
+

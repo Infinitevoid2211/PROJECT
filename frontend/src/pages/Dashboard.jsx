@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { RadialGlowButton } from "../components/ui/radial-glow-button";
 import TextAnimation from "../components/ui/staggerText";
+import Header from "../components/Header";
 import CheckinModal from "../components/CheckinModal";
 import AIAssistant from "../components/AIAssistant";
-import Header from "../components/Header";
 import GisTab from "../components/tabs/GisTab";
 import SensorTab from "../components/tabs/SensorTab";
 import ReportTab from "../components/tabs/ReportTab";
@@ -11,6 +12,7 @@ import HistoryTab from "../components/tabs/HistoryTab";
 
 import { api } from "../lib/api";
 import { riskOf } from "../lib/constants";
+import { t } from "../lib/i18n";
 
 import {
   Map,
@@ -22,63 +24,32 @@ import {
 } from "lucide-react";
 
 const TABS = [
-  {
-    id: "gis",
-    label: "3D Live GIS & GPS",
-    icon: Map,
-    testid: "tab-3d-gis-map",
-  },
-  {
-    id: "sensor",
-    label: "Sensor & ML Warning",
-    icon: Activity,
-    testid: "tab-sensor-telemetry",
-  },
-  {
-    id: "report",
-    label: "Citizen Crack AI",
-    icon: Camera,
-    testid: "tab-citizen-report",
-  },
-  {
-    id: "evac",
-    label: "Evacuation & Check-In",
-    icon: ShieldAlert,
-    testid: "tab-evacuation-gps",
-  },
-  {
-    id: "history",
-    label: "History & ML Model",
-    icon: Database,
-    testid: "tab-history-archive",
-  },
-  {
-    id: "ai",
-    label: "AI Assistant",
-    icon: Bot,
-    testid: "tab-ai-assistant",
-  },
+  { id: "gis", labelKey: "tabGis", defaultLabel: "3D Live GIS & InSAR", icon: Map, testid: "tab-3d-gis-map" },
+  { id: "sensor", labelKey: "tabSensor", defaultLabel: "Sensor & Terzaghi Fs", icon: Activity, testid: "tab-sensor-telemetry" },
+  { id: "report", labelKey: "tabReport", defaultLabel: "Citizen Crack AI", icon: Camera, testid: "tab-citizen-report" },
+  { id: "evac", labelKey: "tabEvac", defaultLabel: "Evacuation & Routing", icon: ShieldAlert, testid: "tab-evacuation-gps" },
+  { id: "history", labelKey: "tabHistory", defaultLabel: "History & ML Model", icon: Database, testid: "tab-history-archive" },
+  { id: "ai", labelKey: "tabAi", defaultLabel: "AI Assistant", icon: Bot, testid: "tab-ai-assistant" },
 ];
 
 const StatChip = ({ image, label, value, color }) => (
   <div className="flex items-center gap-2.5 px-3.5 py-2 bg-white border border-slate-200 rounded-lg shadow-sm">
     <div
-      className="grid place-items-center h-10 w-10 rounded-lg overflow-hidden"
+      className="grid place-items-center h-10 w-10 rounded-lg overflow-hidden shrink-0"
       style={{ background: `${color}18` }}
     >
       <img
         src={image}
         alt={label}
         className="h-8 w-8 object-contain"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
       />
     </div>
-
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-none">
+    <div className="min-w-0">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-none truncate">
         {label}
       </p>
-
-      <p className="font-mono font-bold text-lg text-slate-800 leading-tight">
+      <p className="font-mono font-bold text-lg text-slate-800 leading-tight mt-0.5">
         {value}
       </p>
     </div>
@@ -87,42 +58,15 @@ const StatChip = ({ image, label, value, color }) => (
 
 export default function Dashboard() {
   const [lang, setLang] = useState("en");
-
   const [tab, setTab] = useState("gis");
-
   const [zones, setZones] = useState([]);
-
   const [footfall, setFootfall] = useState(null);
-
   const [stats, setStats] = useState(null);
-
   const [checkinOpen, setCheckinOpen] = useState(false);
 
   const loadCore = useCallback(() => {
-    api
-      .zones()
-      .then((data) => {
-        // Always keep zones as an array.
-        // This prevents .map() / spread errors if the API
-        // returns an error object or unexpected response.
-        setZones(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        setZones([]);
-      });
-
-    api
-      .stats()
-      .then((data) => {
-        setStats(
-          data && typeof data === "object" && !Array.isArray(data)
-            ? data
-            : null
-        );
-      })
-      .catch(() => {
-        setStats(null);
-      });
+    api.zones().then(setZones).catch(() => {});
+    api.stats().then(setStats).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -131,33 +75,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     const tick = () => {
-      api
-        .footfall()
-        .then((data) => {
-          setFootfall(
-            data &&
-              typeof data === "object" &&
-              !Array.isArray(data)
-              ? data
-              : null
-          );
-        })
-        .catch(() => {
-          setFootfall(null);
-        });
+      api.footfall().then(setFootfall).catch(() => {});
     };
-
     tick();
-
-    const id = setInterval(tick, 4000);
-
+    const id = setInterval(tick, 5000);
     return () => clearInterval(id);
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-
-      {/* HEADER / LANGUAGE SELECTOR */}
+      {/* COMMAND CENTER HEADER (Siren, Clock, Multilingual Switcher, SOS) */}
       <Header
         lang={lang}
         setLang={setLang}
@@ -167,20 +94,24 @@ export default function Dashboard() {
 
       {/* HERO / TITLE */}
       <section className="border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
-        <div className="px-6 sm:px-8 py-8">
+        <div className="px-6 sm:px-8 py-6">
           <div className="max-w-4xl">
-
-            <div className="text-2xl sm:text-4xl font-bold tracking-tight">
+            <div className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
               <TextAnimation divideBy="word" delay={0.08}>
-                Bhu-Rakshak Emergency Response
+                {`${t("appName", lang)} — Geotechnical Early Warning`}
               </TextAnimation>
             </div>
-
-            <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400 leading-relaxed">
-              Real-time disaster monitoring, geospatial intelligence and
-              emergency response for Aizawl District.
+            <p className="mt-2 max-w-2xl text-sm sm:text-base text-slate-400 leading-relaxed">
+              {t("tagline", lang)}
             </p>
-
+            <div className="mt-4 flex flex-wrap gap-3">
+              <RadialGlowButton onClick={() => setTab("gis")}>
+                {t("openGis", lang)}
+              </RadialGlowButton>
+              <RadialGlowButton onClick={() => setCheckinOpen(true)}>
+                {t("checkin", lang)}
+              </RadialGlowButton>
+            </div>
           </div>
         </div>
       </section>
@@ -190,92 +121,68 @@ export default function Dashboard() {
         <div className="tick-marquee inline-flex gap-8 py-2 text-xs font-mono">
           {[...zones, ...zones].map((z, i) => (
             <span
-              key={`${z.name}-${i}`}
+              key={`${z.id || z.name}-${i}`}
               className="inline-flex items-center gap-1.5"
             >
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{
-                  background: riskOf(z.risk_level).color,
-                }}
+                style={{ background: riskOf(z.risk_level).color }}
               />
-
               <span>{z.name}:</span>
-
-              <b
-                style={{
-                  color: riskOf(z.risk_level).color,
-                }}
-              >
-                {z.risk_level}
+              <b style={{ color: riskOf(z.risk_level).color }}>
+                {z.risk_level} (Fs {z.factor_of_safety ? z.factor_of_safety.toFixed(2) : "0.85"})
               </b>
-
-              <span>
-                · {z.probability}% · {z.rainfall_24h_mm}mm/24h
+              <span className="text-slate-400">
+                · {z.probability}% · {z.rainfall_24h_mm}mm/24h · {z.soil_moisture}% Sat
               </span>
             </span>
           ))}
         </div>
       </div>
 
-      {/* STATS */}
+      {/* STATS CHIPS */}
       <section className="px-4 sm:px-6 pt-5">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-
-          {/* ZONES */}
           <StatChip
             image="/images/location.jpeg"
-            label="Zones"
+            label="Monitored Zones"
             value={stats?.monitored_zones ?? "—"}
             color="#0B3B60"
           />
-
-          {/* CRITICAL */}
           <StatChip
             image="/images/critical.jpeg"
-            label="Critical"
+            label="Critical (Fs < 1.0)"
             value={stats?.critical_zones ?? "—"}
             color="#DC2626"
           />
-
-          {/* SENSORS */}
           <StatChip
             image="/images/sensors.jpeg"
-            label="Sensors"
-            value={
-              stats
-                ? `${stats.sensors_online}/${stats.sensors_total}`
-                : "—"
-            }
+            label="Sensors Online"
+            value={stats ? `${stats.sensors_online}/${stats.sensors_total}` : "—"}
             color="#34D399"
           />
-
-          {/* ALERTS */}
           <StatChip
             image="/images/alerts.jpeg"
-            label="Alerts"
+            label="CAP Alerts"
             value={stats?.active_alerts ?? "—"}
             color="#EA580C"
           />
-
-          {/* REPORTS */}
           <StatChip
             image="/images/reports.jpeg"
-            label="Reports"
+            label="Citizen Fissures"
             value={stats?.citizen_reports ?? "—"}
             color="#7C3AED"
           />
-
         </div>
       </section>
 
-      {/* TABS */}
+      {/* TABS NAVIGATION */}
       <section className="px-4 sm:px-6 pt-5">
         <div className="flex gap-2 overflow-x-auto thin-scroll pb-1">
-
           {TABS.map((tb) => {
             const Icon = tb.icon;
             const active = tab === tb.id;
+            const label = t(tb.labelKey, lang) || tb.defaultLabel;
 
             return (
               <button
@@ -289,36 +196,26 @@ export default function Dashboard() {
                 }`}
               >
                 <Icon size={16} />
-                {tb.label}
+                {label}
               </button>
             );
           })}
-
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 px-4 sm:px-6 py-6">
-
         {zones.length === 0 ? (
-
           <div className="grid place-items-center h-96">
             <div className="text-center">
-
               <div className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
-
-              <p className="text-sm text-slate-400">
-                Loading pilot data…
+              <p className="text-sm text-slate-400 font-mono">
+                Connecting to geotechnical telemetry…
               </p>
-
             </div>
           </div>
-
         ) : (
-
           <div key={tab} className="fade-up">
-
-            {/* GIS */}
             {tab === "gis" && (
               <GisTab
                 zones={zones}
@@ -328,17 +225,20 @@ export default function Dashboard() {
               />
             )}
 
-            {/* SENSOR */}
             {tab === "sensor" && (
-              <SensorTab zones={zones} />
+              <SensorTab
+                zones={zones}
+                refresh={loadCore}
+              />
             )}
 
-            {/* REPORT */}
             {tab === "report" && (
-              <ReportTab zones={zones} />
+              <ReportTab
+                zones={zones}
+                lang={lang}
+              />
             )}
 
-            {/* EVACUATION */}
             {tab === "evac" && (
               <EvacuationTab
                 zones={zones}
@@ -349,29 +249,25 @@ export default function Dashboard() {
               />
             )}
 
-            {/* HISTORY */}
             {tab === "history" && (
-              <HistoryTab stats={stats} />
+              <HistoryTab
+                stats={stats}
+              />
             )}
 
-            {/* AI ASSISTANT */}
             {tab === "ai" && (
               <div className="max-w-3xl mx-auto h-[600px]">
                 <AIAssistant />
               </div>
             )}
-
           </div>
-
         )}
-
       </main>
 
       {/* FOOTER */}
       <footer className="px-6 py-4 border-t border-white/10 bg-slate-950 text-center">
         <p className="text-xs text-slate-500 font-mono">
-          BHU-RAKSHAK AI · SIH26001 · Ministry of DoNER · Pilot: Aizawl
-          District, Mizoram · Simulated demo data
+          BHU-RAKSHAK AI · SIH26001 · Powered by Google Gemma (Gemini API) · Ministry of DoNER · Pilot: Aizawl District, Mizoram · Calibrated for Terzaghi Fs & Sachet CAP v1.2
         </p>
       </footer>
 
@@ -383,7 +279,6 @@ export default function Dashboard() {
         lang={lang}
         onDone={loadCore}
       />
-
     </div>
   );
 }

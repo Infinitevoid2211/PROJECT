@@ -14,10 +14,11 @@ const PROMPTS = [
 
 export default function AIAssistant() {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Namaste. I'm BHU-RAKSHAK AI — your geotechnical risk & disaster-protocol assistant for Aizawl. Ask me about any zone, or tap a prompt below." },
+    { role: "assistant", content: "Namaste. I'm BHU-RAKSHAK AI powered by Google Gemma through the Gemini API — your geotechnical risk & disaster-protocol assistant for Aizawl. Ask me about any zone, or tap a prompt below." },
   ]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [activeModel, setActiveModel] = useState("gemma-2-27b-it");
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -36,6 +37,9 @@ export default function AIAssistant() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: SESSION, message: q }),
       });
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -50,6 +54,9 @@ export default function AIAssistant() {
           if (!line) continue;
           try {
             const j = JSON.parse(line);
+            if (j.model) {
+              setActiveModel(j.model);
+            }
             if (j.delta) {
               setMessages((m) => {
                 const c = [...m];
@@ -75,9 +82,14 @@ export default function AIAssistant() {
         <div className="grid place-items-center h-8 w-8 rounded-lg bg-[#065F46] text-white"><Bot size={17} /></div>
         <div>
           <p className="font-head font-bold text-sm text-slate-800">AI Risk & Protocol Assistant</p>
-          <p className="text-[11px] text-slate-500 font-mono">Claude · Sonnet 4.6</p>
+          <p className="text-[11px] text-slate-500 font-mono">Google Gemma · Gemini API Geotechnical Intelligence</p>
         </div>
-        <Sparkles size={15} className="ml-auto text-emerald-500" />
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {activeModel}
+          </span>
+          <Sparkles size={15} className="text-emerald-500" />
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto thin-scroll p-4 space-y-3 min-h-[240px]">

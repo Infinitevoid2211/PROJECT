@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 export const API = `${BACKEND_URL}/api`;
 
 export const api = {
@@ -8,6 +8,8 @@ export const api = {
   footfall: () => axios.get(`${API}/footfall`).then((r) => r.data),
   stats: () => axios.get(`${API}/stats`).then((r) => r.data),
   sensors: (id) => axios.get(`${API}/sensors/${id}`).then((r) => r.data),
+  ingestTelemetry: (body) => axios.post(`${API}/telemetry/ingest`, body).then((r) => r.data),
+  insar: () => axios.get(`${API}/insar/displacement`).then((r) => r.data),
   history: () => axios.get(`${API}/history`).then((r) => r.data),
   checkins: () => axios.get(`${API}/checkins`).then((r) => r.data),
   createCheckin: (body) => axios.post(`${API}/checkins`, body).then((r) => r.data),
